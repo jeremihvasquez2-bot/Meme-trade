@@ -1,6 +1,6 @@
 node_modules/
 .env
-data/
-brain/
+/data/
+/brain/
 *.log
 .DS_Store
