@@ -30,6 +30,14 @@ test('risk gate blocks rebuying a token for 4h after a loss on it', () => {
   assert.match(gate.reason, /rebuy blocked/);
 });
 
+test('risk gate blocks buying a token you already hold an open position in', () => {
+  const config = tmpConfig();
+  const state = loadState(config);
+  const gate = checkRiskGate(config, state, { mint: 'A', openPositionsCount: 1, openMints: ['A'] });
+  assert.equal(gate.allowed, false);
+  assert.match(gate.reason, /already holding/);
+});
+
 test('risk gate allows a fresh token after loss elsewhere once cooldown clears', () => {
   const config = tmpConfig();
   let state = loadState(config);

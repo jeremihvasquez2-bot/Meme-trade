@@ -57,11 +57,14 @@ export function positionSizeUsd(config, state) {
 }
 
 // Returns { allowed, reason, sizeUsd }
-export function checkRiskGate(config, state, { mint, openPositionsCount, now = Date.now() }) {
+export function checkRiskGate(config, state, { mint, openPositionsCount, openMints = [], now = Date.now() }) {
   rolloverDailyIfNeeded(state);
 
   if (state.halted) return { allowed: false, reason: `halted: ${state.haltedReason}` };
   if (state.paused) return { allowed: false, reason: 'paused' };
+  if (openMints.includes(mint)) {
+    return { allowed: false, reason: 'already holding an open position in this token' };
+  }
   if (openPositionsCount >= config.rules.maxOpenPositions) {
     return { allowed: false, reason: 'max open positions reached' };
   }

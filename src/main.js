@@ -123,7 +123,7 @@ async function main() {
 
     for (const candidate of buyCandidates) {
       if (control.neverBuy.includes(candidate.features.mint) || control.neverBuy.includes(candidate.features.symbol)) continue;
-      const gate = checkRiskGate(config, state, { mint: candidate.features.mint, openPositionsCount: positions.length });
+      const gate = checkRiskGate(config, state, { mint: candidate.features.mint, openPositionsCount: positions.length, openMints: positions.map((p) => p.mint) });
       if (!gate.allowed) continue;
 
       try {
@@ -261,6 +261,7 @@ async function main() {
       saveState(config, state);
       config.rules = effectiveRules(config);
     },
+    onError: (err) => logger.error('telegram poll error', { error: err.message }),
   }).catch((err) => logger.error('telegram poll loop crashed', { error: err.message }));
 
   await refreshBrain();
