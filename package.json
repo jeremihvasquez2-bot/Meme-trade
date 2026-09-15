@@ -1,0 +1,23 @@
+{
+  "name": "memebot",
+  "version": "1.0.0",
+  "description": "Fully automatic Solana meme-coin trading bot. Rules-only, paper-trades with real Jupiter quotes until it proves itself.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "status": "node scripts/status.js",
+    "replay": "node scripts/replay.js",
+    "entries": "node scripts/entries.js",
+    "simulate": "node scripts/simulate.js",
+    "sweep": "node scripts/sweep.js"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.95.3",
+    "bs58": "^5.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
