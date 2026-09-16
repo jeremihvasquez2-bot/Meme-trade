@@ -119,6 +119,9 @@ async function main() {
       return;
     }
 
+    const topScore = [...buyCandidates, ...shadowCandidates].reduce((max, c) => Math.max(max, c.score), 0);
+    logger.info('scan complete', { safetyPassed: buyCandidates.length + shadowCandidates.length, buyCandidates: buyCandidates.length, topScore });
+
     for (const candidate of shadowCandidates) {
       const id = `shadow-${candidate.features.mint}-${Date.now()}`;
       startPath(config.dataDir, id, { mint: candidate.features.mint, symbol: candidate.features.symbol, entryFeatures: candidate.features, score: candidate.score, shadow: true });
