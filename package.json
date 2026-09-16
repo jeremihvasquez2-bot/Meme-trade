@@ -10,7 +10,8 @@
     "replay": "node scripts/replay.js",
     "entries": "node scripts/entries.js",
     "simulate": "node scripts/simulate.js",
-    "sweep": "node scripts/sweep.js"
+    "sweep": "node scripts/sweep.js",
+    "export": "node scripts/export.js"
   },
   "dependencies": {
     "@solana/web3.js": "^1.95.3",

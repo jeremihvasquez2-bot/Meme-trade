@@ -20,6 +20,12 @@ export function saveFollowed(dataDir, followed) {
   writeJson(followedFile(dataDir), followed);
 }
 
+// How many followed wallets currently hold `mint`, per the last holdings poll.
+export function getSmartMoneyCount(dataDir, mint) {
+  const snapshot = readJson(holdingsFile(dataDir), {});
+  return Object.values(snapshot).filter((mints) => mints.includes(mint)).length;
+}
+
 // Once a day: for the top-volume tokens from the latest scan, pull their top
 // traders and keep only wallets that clear the round-trip/hold/win-rate bar.
 export async function discoverWallets(config, topMints) {

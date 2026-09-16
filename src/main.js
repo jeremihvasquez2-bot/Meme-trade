@@ -14,6 +14,7 @@ import { hydrateTokens, toFeatures } from './research/dexscreener.js';
 import { runScan } from './research/scan.js';
 import { evaluateExit } from './exits/rules.js';
 import { startPath, recordTick } from './learning/paths.js';
+import { addShadow, pruneExpired } from './learning/shadowTracker.js';
 import { effectiveRules, loadProposals, approveProposal, rejectProposal } from './proposals/proposals.js';
 import { discoverWallets, pollHoldings } from './copytrade/follow.js';
 import { ensureBrain, readControlNote, writeHomeNote, appendJournal, writeTokenNote, appendLesson, writeRulesNote, writeProposalsNote } from './brain/writer.js';
@@ -120,8 +121,9 @@ async function main() {
 
     for (const candidate of shadowCandidates) {
       const id = `shadow-${candidate.features.mint}-${Date.now()}`;
-      startPath(config.dataDir, id, { mint: candidate.features.mint, symbol: candidate.features.symbol, entryFeatures: candidate.features, shadow: true });
+      startPath(config.dataDir, id, { mint: candidate.features.mint, symbol: candidate.features.symbol, entryFeatures: candidate.features, score: candidate.score, shadow: true });
       recordTick(config.dataDir, id, { priceUsd: candidate.features.priceUsd, m5Pct: candidate.features.m5Pct, buySell5m: candidate.features.buySellRatio5m, volume5mUsd: candidate.features.volume5mUsd });
+      addShadow(config.dataDir, { id, mint: candidate.features.mint });
     }
 
     for (const candidate of buyCandidates) {
@@ -152,6 +154,9 @@ async function main() {
         positions.push(pos);
         savePositions(config, positions);
 
+        startPath(config.dataDir, pos.id, { mint: pos.mint, symbol: pos.symbol, entryFeatures: candidate.features, score: candidate.score, shadow: false });
+        recordTick(config.dataDir, pos.id, { priceUsd: fill.priceUsd, m5Pct: candidate.features.m5Pct, buySell5m: candidate.features.buySellRatio5m, volume5mUsd: candidate.features.volume5mUsd });
+
         writeTokenNote(config, { symbol: candidate.features.symbol, mint: candidate.features.mint, pnlUsd: 0, outcome: 'OPEN', openedAt: pos.openedAt, closedAt: pos.openedAt, fills: pos.fills }, {
           whyBought: `score ${candidate.score} (momentum ${candidate.breakdown.momentumScore}, buy pressure ${candidate.breakdown.buyPressureScore}, turnover ${candidate.breakdown.turnoverScore}, safety ${candidate.breakdown.safetyScore}, age ${candidate.breakdown.ageScore})`,
           safetyAtEntry: `rugcheck ${candidate.features.rugcheckScore}, sell impact ${candidate.features.sellPriceImpactPct?.toFixed(1)}%, authorities revoked`,
@@ -180,6 +185,10 @@ async function main() {
         ? { priceUsd: features.priceUsd, buySellRatio5m: features.buySellRatio5m, m5Pct: features.m5Pct, volume5mUsd: features.volume5mUsd }
         : { missingPrice: true };
 
+      recordTick(config.dataDir, pos.id, market.missingPrice
+        ? { missingPrice: true }
+        : { priceUsd: market.priceUsd, m5Pct: market.m5Pct, buySell5m: market.buySellRatio5m, volume5mUsd: market.volume5mUsd });
+
       const decision = evaluateExit(pos, market, config.rules);
       if (decision.action === 'none') continue;
 
@@ -201,6 +210,19 @@ async function main() {
       } catch (err) {
         logger.error('sell failed', { mint: pos.mint, error: err.message });
       }
+    }
+  }
+
+  async function shadowTickCycle() {
+    const active = pruneExpired(config.dataDir, config.rules.shadowPathDurationMs);
+    if (!active.length) return;
+    const pairs = await hydrateTokens(active.map((s) => s.mint)).catch(() => []);
+    for (const shadow of active) {
+      const pair = pairs.find((x) => x.baseToken?.address === shadow.mint);
+      const features = pair ? toFeatures(pair) : null;
+      recordTick(config.dataDir, shadow.id, features
+        ? { priceUsd: features.priceUsd, m5Pct: features.m5Pct, buySell5m: features.buySellRatio5m, volume5mUsd: features.volume5mUsd }
+        : { missingPrice: true });
     }
   }
 
@@ -229,6 +251,7 @@ async function main() {
 
   setInterval(() => scanCycle().catch((err) => logger.error('scanCycle error', { error: err.message })), config.rules.scanIntervalMs);
   setInterval(() => exitCycle().catch((err) => logger.error('exitCycle error', { error: err.message })), config.rules.exitCheckIntervalMs);
+  setInterval(() => shadowTickCycle().catch((err) => logger.error('shadowTickCycle error', { error: err.message })), config.rules.exitCheckIntervalMs);
   setInterval(() => refreshBrain().catch(() => {}), 5 * 60 * 1000);
   setInterval(() => pollHoldings(config).catch(() => []), config.rules.copytrade.pollIntervalMs);
   setInterval(() => copytradeDailyJob().catch(() => {}), 24 * 60 * 60 * 1000);

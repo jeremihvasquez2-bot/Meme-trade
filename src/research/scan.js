@@ -5,6 +5,7 @@ import { getMintAuthorities } from './rpc.js';
 import { estimateSellPriceImpactPct, getSolUsdPrice } from './jupiter.js';
 import { passesFilters } from './filters.js';
 import { scoreCandidate } from './scoring.js';
+import { getSmartMoneyCount } from '../copytrade/follow.js';
 
 async function collectCandidateMints() {
   const [profiles, boostsLatest, boostsTop, trending, newPools] = await Promise.all([
@@ -81,6 +82,7 @@ export async function runScan(config) {
       rugcheckRisks: rugcheck.risks,
       sellPriceImpactPct: sellPriceImpactPct ?? undefined,
       decimals: authorities.decimals,
+      smartMoneyCount: getSmartMoneyCount(config.dataDir, features.mint),
     };
 
     const { passed, reasons } = passesFilters(full, rules.filters);
