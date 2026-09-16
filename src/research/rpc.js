@@ -6,11 +6,22 @@ export function getConnection(config) {
   return connection;
 }
 
+// @solana/web3.js's Connection methods have no built-in timeout, and the
+// free public RPC endpoint is known to occasionally hang instead of
+// erroring. Without this, one stuck call could wedge the whole scan loop
+// forever, since scan.js awaits these sequentially per candidate.
+function withTimeout(promise, ms = 10_000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('RPC call timed out')), ms)),
+  ]);
+}
+
 // Returns { mintAuthorityRevoked, freezeAuthorityRevoked, decimals } or null on failure.
 export async function getMintAuthorities(config, mint) {
   try {
     const conn = getConnection(config);
-    const info = await conn.getParsedAccountInfo(new PublicKey(mint));
+    const info = await withTimeout(conn.getParsedAccountInfo(new PublicKey(mint)));
     const parsed = info?.value?.data?.parsed;
     if (!parsed || parsed.type !== 'mint') return null;
     return {
@@ -26,7 +37,7 @@ export async function getMintAuthorities(config, mint) {
 export async function getTokenBalance(config, owner, mint) {
   try {
     const conn = getConnection(config);
-    const accounts = await conn.getParsedTokenAccountsByOwner(new PublicKey(owner), { mint: new PublicKey(mint) });
+    const accounts = await withTimeout(conn.getParsedTokenAccountsByOwner(new PublicKey(owner), { mint: new PublicKey(mint) }));
     let total = 0;
     for (const { account } of accounts.value) {
       total += account.data.parsed.info.tokenAmount.uiAmount || 0;
@@ -40,7 +51,7 @@ export async function getTokenBalance(config, owner, mint) {
 export async function getSolBalance(config, owner) {
   try {
     const conn = getConnection(config);
-    const lamports = await conn.getBalance(new PublicKey(owner));
+    const lamports = await withTimeout(conn.getBalance(new PublicKey(owner)));
     return lamports / 1e9;
   } catch {
     return 0;
@@ -52,7 +63,7 @@ export async function getWalletHoldings(config, owner) {
   try {
     const conn = getConnection(config);
     const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
-    const accounts = await conn.getParsedTokenAccountsByOwner(new PublicKey(owner), { programId: TOKEN_PROGRAM_ID });
+    const accounts = await withTimeout(conn.getParsedTokenAccountsByOwner(new PublicKey(owner), { programId: TOKEN_PROGRAM_ID }));
     return accounts.value
       .map(({ account }) => account.data.parsed.info)
       .filter((info) => (info.tokenAmount.uiAmount || 0) > 0)

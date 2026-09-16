@@ -113,7 +113,10 @@ async function main() {
       logger.error('scan failed', { error: err.message });
       return { buyCandidates: [], shadowCandidates: [] };
     });
-    if (!solUsd) return;
+    if (!solUsd) {
+      logger.error('scanCycle: could not get SOL/USD price, skipping this cycle');
+      return;
+    }
 
     for (const candidate of shadowCandidates) {
       const id = `shadow-${candidate.features.mint}-${Date.now()}`;
@@ -164,7 +167,10 @@ async function main() {
   async function exitCycle() {
     if (!positions.length) return;
     const solUsd = await getSolUsdPrice().catch(() => null);
-    if (!solUsd) return;
+    if (!solUsd) {
+      logger.error('exitCycle: could not get SOL/USD price, skipping this cycle');
+      return;
+    }
     const pairs = await hydrateTokens(positions.map((p) => p.mint)).catch(() => []);
 
     for (const pos of [...positions]) {
