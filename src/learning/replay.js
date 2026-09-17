@@ -29,8 +29,13 @@ export function replayPathFromEntry(ticks, entryIndex, rules) {
     const decision = evaluateExit(position, market, rules, tick.ts);
     if (decision.action === 'none') continue;
 
+    // A forced "strikes" exit fires precisely because the price is missing at
+    // this tick, so there is no real sale price to value it at — treat that
+    // portion as a total write-off (0) rather than dividing by an undefined
+    // price, which would poison the whole average with NaN.
+    const salePrice = typeof tick.priceUsd === 'number' ? tick.priceUsd : 0;
     const soldPortion = remainingPortion * decision.portion;
-    proceedsPortion += soldPortion * (tick.priceUsd / entry.priceUsd);
+    proceedsPortion += soldPortion * (salePrice / entry.priceUsd);
     remainingPortion -= soldPortion;
 
     if (decision.action === 'sell_all' || remainingPortion <= 0.0001) {

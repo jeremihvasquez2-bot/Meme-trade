@@ -197,10 +197,18 @@ async function main() {
 
       try {
         const sellTokenAmount = pos.remainingTokenAmount * decision.portion;
+        // A forced "strikes" exit means the price has been missing for a
+        // while. In live mode we still try to actually get the tokens back
+        // to SOL; in paper mode there's no real position to unwind and no
+        // price to fairly paper-sell at, so it's written off as a total
+        // loss on the remaining amount rather than attempting a fake quote
+        // (or, worse, a real on-chain sell with no wallet configured).
         const fill =
-          config.mode === 'live' || decision.forceOnChain
+          config.mode === 'live'
             ? await sellLive(config, { mint: pos.mint, tokenAmount: sellTokenAmount, decimals: pos.decimals ?? 9, full: decision.portion >= 1, solUsd })
-            : await sellPaper({ mint: pos.mint, decimals: pos.decimals ?? 9, tokenAmount: sellTokenAmount, solUsd });
+            : decision.forceOnChain
+              ? { tokenAmount: sellTokenAmount, priceUsd: 0, amountUsd: 0, feeUsd: 0 }
+              : await sellPaper({ mint: pos.mint, decimals: pos.decimals ?? 9, tokenAmount: sellTokenAmount, solUsd });
 
         applySellFill(pos, fill);
         savePositions(config, positions);

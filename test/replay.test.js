@@ -33,6 +33,30 @@ test('replay marks-to-last-price when the path ends before any exit fires', () =
   assert.equal(result.returnMultiple, 1.1);
 });
 
+test('a forced strikes exit writes off the position instead of producing NaN', () => {
+  const missing = { ts: 0, missingPrice: true }; // no priceUsd key at all
+  const ticks = [
+    tick(0, 1),
+    { ...missing, ts: 15_000 },
+    { ...missing, ts: 30_000 },
+    { ...missing, ts: 45_000 },
+    { ...missing, ts: 60_000 },
+    { ...missing, ts: 75_000 }, // 5th consecutive miss forces the exit
+  ];
+  const result = replayPathFromEntry(ticks, 0, DEFAULT_RULES);
+  assert.equal(result.exitReason, 'strikes');
+  assert.equal(Number.isNaN(result.returnMultiple), false);
+  assert.equal(result.returnMultiple, 0); // total write-off, not a real sale price
+});
+
+test('replayAll never returns NaN even when one path had a forced write-off', () => {
+  const missing = { ts: 0, missingPrice: true };
+  const strikesPath = { ticks: [tick(0, 1), { ...missing, ts: 15_000 }, { ...missing, ts: 30_000 }, { ...missing, ts: 45_000 }, { ...missing, ts: 60_000 }, { ...missing, ts: 75_000 }] };
+  const normalPath = { ticks: [tick(0, 1), tick(15_000, 1.1)] };
+  const summary = replayAll([strikesPath, normalPath], DEFAULT_RULES);
+  assert.equal(Number.isNaN(summary.avgReturnPct), false);
+});
+
 test('replayAll averages return pct across many recorded paths', () => {
   const winPath = { ticks: [tick(0, 1), tick(15_000, 2.5, { buySell5m: 1, m5Pct: 1, volume5mUsd: 1 })] };
   const losePath = { ticks: [tick(0, 1), tick(15_000, 0.74)] };
