@@ -193,7 +193,14 @@ async function main() {
         : { priceUsd: market.priceUsd, m5Pct: market.m5Pct, buySell5m: market.buySellRatio5m, volume5mUsd: market.volume5mUsd });
 
       const decision = evaluateExit(pos, market, config.rules);
-      if (decision.action === 'none') continue;
+      if (decision.action === 'none') {
+        // evaluateExit mutates pos.peakPriceUsd / missedPriceStrikes in place even
+        // when it decides not to exit yet. Persist that now, not just on a sell —
+        // otherwise a restart mid-hold forgets how high the price ran and re-arms
+        // the trailing stop from the stale on-disk peak (understating drawdown).
+        savePositions(config, positions);
+        continue;
+      }
 
       try {
         const sellTokenAmount = pos.remainingTokenAmount * decision.portion;
