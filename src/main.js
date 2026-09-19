@@ -132,7 +132,14 @@ async function main() {
     for (const candidate of buyCandidates) {
       if (control.neverBuy.includes(candidate.features.mint) || control.neverBuy.includes(candidate.features.symbol)) continue;
       const gate = checkRiskGate(config, state, { mint: candidate.features.mint, openPositionsCount: positions.length, openMints: positions.map((p) => p.mint) });
-      if (!gate.allowed) continue;
+      if (!gate.allowed) {
+        // Without this, a qualifying candidate silently vanishing looks identical
+        // whether it's a safety rule doing its job (cooldown, daily cap, max
+        // positions) or an actual bug blocking every buy — this is the only
+        // record of which one it was.
+        logger.info('buy skipped by risk gate', { mint: candidate.features.mint, symbol: candidate.features.symbol, score: candidate.score, reason: gate.reason });
+        continue;
+      }
 
       try {
         const fill =
